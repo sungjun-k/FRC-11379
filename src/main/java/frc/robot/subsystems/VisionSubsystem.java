@@ -29,16 +29,19 @@ public class VisionSubsystem extends SubsystemBase {
      *   Rotation3d(롤, 피치, 요우) - 정면을 바라보면 모두 0
      */
     private static final Transform3d CAMERA_OFFSET = new Transform3d(
-        new Translation3d(0.0, 0.0, 0.5),   // 假정: 로봇 중심에서 위로 0.5m
+        new Translation3d(0.0, 0.0, 0.5),   // 가정: 로봇 중심에서 위로 0.5m
         new Rotation3d(0, 0, 0)
     );
 
     private final PhotonPoseEstimator m_photonEstimator;
 
     public VisionSubsystem() {
-        // 假정: AprilTagFields.k2026Reefscape - 2026 시즐 필드맵
-        // WPILib 버전에 따라 상수명이 다를 수 있으니 빌드 오류 시 확인
-        var layout = AprilTagFieldLayout.loadField(AprilTagFields.k2026Reefscape);
+        // kDefaultField: WPILib가 현재 시즌 기준 최신 필드를 자동으로 가리킨다.
+        // k2026Reefscape 는 2025 시즌 상수라 2026 환경에서 존재하지 않으므로
+        // 시즌 고유 상수를 쓰고 싶다면 IDE 자동완성으로 k2026... 항목을 확인하세요.
+        AprilTagFieldLayout layout =
+            AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
+
         m_photonEstimator = new PhotonPoseEstimator(
             layout,
             // 여러 태그를 동시에 보이면 정확도가 높아진다
