@@ -50,7 +50,7 @@ public class DriveSubsystem extends SubsystemBase {
     public DriveSubsystem() {
         configureTalon(m_leftFront,  false);
         configureTalon(m_leftRear,   false);
-        configureTalon(m_rightFront, true);  // [가정] 우측 반전
+        configureTalon(m_rightFront, true);  
         configureTalon(m_rightRear,  true);
 
         m_drive.setSafetyEnabled(false);
@@ -177,7 +177,7 @@ public class DriveSubsystem extends SubsystemBase {
     /** PathPlanner에서 계산한 목표 속도로 구동 */
     public void driveRobotRelative(ChassisSpeeds speeds) {
         var wheelSpeeds = m_kinematics.toWheelSpeeds(speeds);
-        wheelSpeeds.desaturate(MAX_SPEED_MPS);
+        wheelSpeeds.desaturate(MAX_SPEED_MPS);  
         m_drive.tankDrive(
             wheelSpeeds.leftMetersPerSecond  / MAX_SPEED_MPS,
             wheelSpeeds.rightMetersPerSecond / MAX_SPEED_MPS

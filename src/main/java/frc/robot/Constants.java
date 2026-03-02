@@ -31,7 +31,7 @@ public final class Constants {
 
     public static final class OIConstants {
         public static final int DRIVER_CONTROLLER_PORT   = 0;
-        public static final int OPERATOR_CONTROLLER_PORT = 1;
+        public static final int OPERATOR_CONTROLLER_PORT = 0;
     }
 
     public static final class ShooterConstants {
@@ -57,18 +57,17 @@ public final class Constants {
 
         // ── 롤러 설정 ──
         /** 롤러 출력 (0.0 ~ 1.0) */
-        public static final double ROLLER_SPEED = 0.7;
+        public static final double ROLLER_SPEED = 0.8;
 
         /**
          * ★ 롤러 방향 반전 플래그
-         *   false = 버튼 누르면 정회전 (인테이크 IN 방향)
-         *   true  = 버튼 누르면 역회전 (인테이크 OUT 방향)
-         *   → 기구 조립 후 실제 방향 확인하여 변경하세요.
+         *   false = 버튼 누르면 정회전 (인테이크 OUT 방향)
+         *   true  = 버튼 누르면 역회전 (인테이크 IN 방향)
          */
-        public static final boolean ROLLER_INVERTED = false;
+        public static final boolean ROLLER_INVERTED = true;
 
         /** 롤러 전류 제한 (A) — Kraken X60 연속 권장: 60~80A */
-        public static final double ROLLER_SUPPLY_CURRENT_LIMIT_AMPS = 60.0;
+        public static final double ROLLER_SUPPLY_CURRENT_LIMIT_AMPS = 30.0;
 
         // ── 피벗 설정 ──
         /** 피벗 출력 (0.0 ~ 1.0) */
