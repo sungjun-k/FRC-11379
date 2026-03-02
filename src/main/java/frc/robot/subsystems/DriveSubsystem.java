@@ -22,6 +22,7 @@ import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -47,6 +48,9 @@ public class DriveSubsystem extends SubsystemBase {
         new DifferentialDriveKinematics(TRACK_WIDTH_METERS);
     private final DifferentialDrivePoseEstimator m_poseEstimator;
 
+    // ── Field2d: Glass/SmartDashboard 필드 시각화 ──────
+    private final Field2d m_field = new Field2d();
+
     // ───────────────────────────────────────────────
     public DriveSubsystem(VisionSubsystem vision) {
         m_gyro   = new AHRS(AHRS.NavXComType.kMXP_SPI);
@@ -54,7 +58,7 @@ public class DriveSubsystem extends SubsystemBase {
 
         configureTalon(m_leftFront,  false);
         configureTalon(m_leftRear,   false);
-        configureTalon(m_rightFront, true);  // 우측 반전
+        configureTalon(m_rightFront, true);
         configureTalon(m_rightRear,  true);
 
         m_drive.setSafetyEnabled(false);
@@ -72,12 +76,14 @@ public class DriveSubsystem extends SubsystemBase {
             getRightDistanceMeters(),
             new Pose2d(),
             // 오도메트리 신뢰도 표준편차 [x(m), y(m), theta(rad)]
-            // 값이 작을수록 오도메트리를 더 신뢰 -> 주행 중 오차가 적으면 낮춰라
+            // 값이 작을수록 오도메트리를 더 신뢰
             VecBuilder.fill(0.05, 0.05, 0.05),
-            // 비전 측정값 신뢰도 표준편차 [x(m), y(m), theta(rad)]
-            // 값이 작을수록 비전을 더 신뢰 -> 태그가 멀리 있으면 크게 설정
+            // 비전 기본 표준편차 (periodic에서 동적으로 덮어씀)
             VecBuilder.fill(0.5, 0.5, 0.5)
         );
+
+        // Field2d를 SmartDashboard/Glass에 등록
+        SmartDashboard.putData("Field", m_field);
 
         configurePathPlanner();
     }
@@ -135,19 +141,38 @@ public class DriveSubsystem extends SubsystemBase {
             getRightDistanceMeters()
         );
 
-        // 2단계: ★ 칼만 필터 핵심 - 비전 측정값 자동 융합
-        // 타임스탬프를 함께 넣어서 시간 지연 보정도 수행
-        m_vision.getEstimatedPose().ifPresent(estimated ->
-            m_poseEstimator.addVisionMeasurement(
-                estimated.estimatedPose.toPose2d(),
-                estimated.timestampSeconds
-            )
-        );
+        // 2단계: ★ 칼만 필터 - 동적 표준편차 비전 융합
+        // 거리가 멀수록 비전 신뢰도를 자동으로 낮춤
+        m_vision.getEstimatedPose().ifPresent(estimated -> {
+            Pose2d visionPose = estimated.estimatedPose.toPose2d();
 
+            // 현재 오도메트리 위치와 비전 추정 위치의 거리(m)
+            double distanceM = m_poseEstimator.getEstimatedPosition()
+                .getTranslation()
+                .getDistance(visionPose.getTranslation());
+
+            // 거리 제곱 비례 동적 표준편차: 1m → 0.45m, 3m → 1.65m, 5m → 4.05m
+            double xyStdDev    = 0.3 + Math.pow(distanceM, 2.0) * 0.15;
+            double thetaStdDev = 0.6 + Math.pow(distanceM, 2.0) * 0.10;
+
+            m_poseEstimator.addVisionMeasurement(
+                visionPose,
+                estimated.timestampSeconds,
+                VecBuilder.fill(xyStdDev, xyStdDev, thetaStdDev)
+            );
+
+            // Glass에서 비전 추정 위치를 별도 오브젝트로 표시 (오도메트리 vs 비전 비교용)
+            m_field.getObject("visionPose").setPose(visionPose);
+            SmartDashboard.putNumber("Vision StdDev XY", xyStdDev);
+            SmartDashboard.putNumber("Vision Dist (m)", distanceM);
+        });
+
+        // 3단계: SmartDashboard + Field2d 갱신
         var pose = m_poseEstimator.getEstimatedPosition();
-        SmartDashboard.putNumber("Pose X (m)",    pose.getX());
-        SmartDashboard.putNumber("Pose Y (m)",    pose.getY());
-        SmartDashboard.putNumber("Pose Deg",      pose.getRotation().getDegrees());
+        m_field.setRobotPose(pose);
+        SmartDashboard.putNumber("Pose X (m)",     pose.getX());
+        SmartDashboard.putNumber("Pose Y (m)",     pose.getY());
+        SmartDashboard.putNumber("Pose Deg",       pose.getRotation().getDegrees());
         SmartDashboard.putNumber("Left Dist (m)",  getLeftDistanceMeters());
         SmartDashboard.putNumber("Right Dist (m)", getRightDistanceMeters());
         SmartDashboard.putNumber("Gyro Yaw (deg)", getGyroRotation().getDegrees());
@@ -191,9 +216,14 @@ public class DriveSubsystem extends SubsystemBase {
         );
     }
 
-    /** PathPlanner에서 계산한 목표 속도로 구동 */
+    /**
+     * PathPlanner에서 계산한 목표 속도로 구동
+     * ChassisSpeeds.discretize(): 회전+직진 동시 동작 시 호 형태 경로 오차 보정
+     */
     public void driveRobotRelative(ChassisSpeeds speeds) {
-        var wheelSpeeds = m_kinematics.toWheelSpeeds(speeds);
+        // ★ 20ms 루프 지연으로 인한 경로 이탈 보정 (특히 커브 구간)
+        ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
+        var wheelSpeeds = m_kinematics.toWheelSpeeds(discreteSpeeds);
         wheelSpeeds.desaturate(MAX_SPEED_MPS);
         m_drive.tankDrive(
             wheelSpeeds.leftMetersPerSecond  / MAX_SPEED_MPS,
