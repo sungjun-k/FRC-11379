@@ -49,6 +49,7 @@ public class RobotContainer {
      *   LB 버튼 (button 5) → 피벗 UP
      *   RB 버튼 (button 6) → 피벗 DOWN
      *   B 버튼  (button 2) → 콘베이어 구동
+     *   X 버튼  (button 3) → 제자리 AprilTag 조준
      */
     private final CommandXboxController m_operatorController =
         new CommandXboxController(OPERATOR_CONTROLLER_PORT);

@@ -11,7 +11,7 @@ public final class Constants {
 
         // 텔레옵 속도 스케일
         public static final double DRIVE_SPEED_SCALE    = 0.7;
-        public static final double DRIVE_ROTATION_SCALE = 0.6;
+        public static final double DRIVE_ROTATION_SCALE = 0.3;
 
         // 전류 제한 (A)
         public static final double SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
@@ -26,7 +26,8 @@ public final class Constants {
             (Math.PI * WHEEL_DIAMETER_METERS) / GEAR_RATIO;
 
         // [가정] PathPlanner용 최대 속도 — 실측 권장
-        public static final double MAX_SPEED_MPS = 5.45;
+        public static final double MAX_SPEED_MPS = 5.0; // 5 m/s (약 18 km/h)
+        
     }
 
     public static final class OIConstants {
