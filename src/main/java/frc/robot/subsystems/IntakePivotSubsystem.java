@@ -6,7 +6,6 @@ import com.revrobotics.PersistMode;
 import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkClosedLoopController;
-import com.revrobotics.spark.SparkClosedLoopController.ArbFFUnits;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.config.ClosedLoopConfig;
@@ -19,14 +18,15 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.IntakeConstants;
 
 /**
- * 인테이크 피벗 서브시스템 (Position PID + Gravity Feedforward + Soft Limit)
+ * 인테이크 피벗 서브시스템 (Position PID + Soft Limit)
  *
  * 동작 원리:
  *   - 항상 m_targetPosition을 향해 Position PID로 이동
- *   - 매 루프 중력 보상 전압(kG * cos(각도))을 ArbFF로 추가 → 버튼 떼도 제자리 유지
  *   - Soft Limit: FORWARD/REVERSE 범위 이탈 시 SparkMax가 하드웨어 차단
+ *   - 중력 보상(ArbFF)은 setReference의 arbFF 파라미터가 REVLib 2025+에서 deprecated되어
+ *     현재 SmartDashboard 모니터링만 수행함. 필요 시 피드포워드 대체 구현 필요.
  *
- * 중요: 전원 켤 때 피벗이 반드시 홈(수납) 위치에 있어야 소프트 리밋이 정확함!
+ * 중요: 전원 켤 때 피벗이 반드시 홈(수납) 위치에 있어야 소프트 리미트가 정확함!
  */
 public class IntakePivotSubsystem extends SubsystemBase {
 
@@ -44,9 +44,9 @@ public class IntakePivotSubsystem extends SubsystemBase {
         SoftLimitConfig softLimitConfig = new SoftLimitConfig();
         softLimitConfig
             .forwardSoftLimitEnabled(true)
-            .forwardSoftLimit(IntakeConstants.PIVOT_FORWARD_SOFT_LIMIT)  // 최대 전개 위치
+            .forwardSoftLimit(IntakeConstants.PIVOT_FORWARD_SOFT_LIMIT)  // 최대 위 한계
             .reverseSoftLimitEnabled(true)
-            .reverseSoftLimit(IntakeConstants.PIVOT_REVERSE_SOFT_LIMIT); // 최대 수납 위치
+            .reverseSoftLimit(IntakeConstants.PIVOT_REVERSE_SOFT_LIMIT); // 최대 아래 한계
 
         // ── Position PID 설정 (SparkMax 온보드) ──
         // feedbackSensor 생략 → SparkMax는 기본값이 이미 kPrimaryEncoder
@@ -55,7 +55,7 @@ public class IntakePivotSubsystem extends SubsystemBase {
             .p(IntakeConstants.PIVOT_KP)
             .i(IntakeConstants.PIVOT_KI)
             .d(IntakeConstants.PIVOT_KD)
-            .outputRange(-0.2, 0.2); // 최대 출력 50% 제한: 급격한 동작 방지
+            .outputRange(-0.2, 0.2); // 최대 출력 20% 제한: 급격한 동작 방지
 
         // ── 전체 SparkMax 설정 ──
         SparkMaxConfig config = new SparkMaxConfig();
@@ -77,7 +77,7 @@ public class IntakePivotSubsystem extends SubsystemBase {
     }
 
     // ───────────────────────────────────────────────────────────
-    // ★ 중력 보상 계산
+    // ★ 중력 보상 값 계산 (SmartDashboard 모니터링 전용)
     // 공식: kG * cos(수평 기준 현재 각도)
     //   수평(0°)에서 cos=1.0 → 최대 보상  (중력이 가장 센 자세)
     //   수직 위(90°)에서 cos=0.0 → 보상 없음 (중력 토크 없음)
@@ -103,8 +103,8 @@ public class IntakePivotSubsystem extends SubsystemBase {
     }
 
     /**
-     * 현재 위치에서 그대로 멈춤 (버튼 떼면 호출)
-     * kG가 중력을 보상하므로 가동 컴포넌트만으론 버틸 수 없는 무거운 암도 제자리 유지
+     * 현재 위치에서 그대로 멈춴 (버튼 돼면 호출)
+     * kBrake 모드 + PID로 같은 위치를 유지
      */
     public void holdCurrentPosition() {
         m_targetPosition = m_encoder.getPosition();
@@ -144,24 +144,21 @@ public class IntakePivotSubsystem extends SubsystemBase {
     }
 
     // ───────────────────────────────────────────────────────────
-    // 주기적 실행: 항상 PID + 중력 보상으로 m_targetPosition 유지
+    // 주기적 실행: Position PID로 m_targetPosition 유지
     // ───────────────────────────────────────────────────────────
     @Override
     public void periodic() {
-        double arbFF = getGravityFeedforward();
-
-        // SparkMax 온보드 Position PID + ArbFF(중력 보상 전압)
+        // SparkMax 온보드 Position PID (3파라미터, REVLib 2025+ deprecated API 미사용)
         m_controller.setReference(
-        m_targetPosition,
-        ControlType.kPosition,
-        ClosedLoopSlot.kSlot0,
-        arbFF
-    );
+            m_targetPosition,
+            ControlType.kPosition,
+            ClosedLoopSlot.kSlot0
+        );
 
         SmartDashboard.putNumber("Pivot/Position (rot)", m_encoder.getPosition());
         SmartDashboard.putNumber("Pivot/Target (rot)",   m_targetPosition);
         SmartDashboard.putNumber("Pivot/Current (A)",    m_pivotMotor.getOutputCurrent());
-        SmartDashboard.putNumber("Pivot/GravityFF (V)",  arbFF);
+        SmartDashboard.putNumber("Pivot/GravityFF (V)",  getGravityFeedforward()); // 모니터링 전용
         SmartDashboard.putBoolean("Pivot/AtTarget",      isAtTarget());
     }
 }
