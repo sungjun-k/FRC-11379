@@ -34,10 +34,20 @@ public class ShooterSubsystem extends SubsystemBase {
         m_motor7.getConfigurator().apply(config7); 
     }
 
+    /**
+     * 5번, 7번 모터만 출력 설정 (6번은 제외)
+     */
     public void setOutput(double output) {
         m_motor5.set(output);
-        m_motor6.set(output);
+        // m_motor6.set(output);  // 6번 모터는 제외
         m_motor7.set(output);
+    }
+    
+    /**
+     * 6번 모터만 고정 속도로 구동 (0.8)
+     */
+    public void setMotor6Fixed(double fixedSpeed) {
+        m_motor6.set(fixedSpeed);
     }
 
     public void stop() {

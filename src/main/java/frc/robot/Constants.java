@@ -10,8 +10,8 @@ public final class Constants {
         public static final int RIGHT_REAR_ID  = 4;
 
         // 텔레옵 속도 스케일
-        public static final double DRIVE_SPEED_SCALE    = 0.7;
-        public static final double DRIVE_ROTATION_SCALE = 0.3;
+        public static final double DRIVE_SPEED_SCALE    = 0.6;
+        public static final double DRIVE_ROTATION_SCALE = 0.35;
 
         // 전류 제한 (A)
         public static final double SUPPLY_CURRENT_LIMIT_AMPS = 40.0;

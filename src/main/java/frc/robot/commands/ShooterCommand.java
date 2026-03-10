@@ -16,7 +16,7 @@ public class ShooterCommand extends Command {
     private final BooleanSupplier  m_povDownSupplier;
 
     /** D-pad으로 설정한 슈터 목표 속도 (0.0 ~ 1.0, 5% 단위) */
-    private double  m_speedTarget = 0.8;
+    private double  m_speedTarget = 0.95;
     private boolean m_prevPovUp   = false;
     private boolean m_prevPovDown = false;
 
@@ -70,7 +70,18 @@ public class ShooterCommand extends Command {
         }
 
         SmartDashboard.putNumber("Shooter/SpeedTarget %", m_speedTarget * 100.0);
+        
+        // 5번, 7번 모터: 속도 조정 가능
         m_shooter.setOutput(output);
+        
+        // 6번 모터: 고정 속도 0.8 (D-pad와 무관하게 일정)
+        if (rt > 0.05) {
+            m_shooter.setMotor6Fixed(0.9);
+        } else if (lt > 0.05) {
+            m_shooter.setMotor6Fixed(-0.8);
+        } else {
+            m_shooter.setMotor6Fixed(0.0);
+        }
     }
 
     @Override
