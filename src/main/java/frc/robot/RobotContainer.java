@@ -27,7 +27,6 @@ import frc.robot.subsystems.VisionSubsystem;
 
 public class RobotContainer {
 
-    // ── 서브시스템 ────────────────────────────────────────────
     private final VisionSubsystem       m_vision        = new VisionSubsystem();
     private final DriveSubsystem        m_drive         = new DriveSubsystem(m_vision);
     private final ShooterSubsystem      m_shooter       = new ShooterSubsystem();
@@ -35,25 +34,23 @@ public class RobotContainer {
     private final IntakePivotSubsystem  m_intakePivot   = new IntakePivotSubsystem();
     private final ConveyorSubsystem     m_conveyor      = new ConveyorSubsystem();
 
-    // ── 컨트롤러 ─────────────────────────────────────────────
     /**
-     * 포트 0: 드라이버 (송주원)
-     *   왼쪽 스틱 Y / 오른쪽 스틱 X → 탱크 드라이브
-     *   RT  → AutoAlignCommand (AprilTag ID 10 or 26, 방향만 정렬)
-     *   LB  → 인테이크 롤러 정방향 (흡입)
-     *   RB  → 인테이크 롤러 역방향 (토출)
-     *   Y   → 피벗 UP   A → 피벗 DOWN
+     * Port 0: Driver (송주원)
+     *   Left Y / Right X -> Tank Drive
+     *   RT  -> AutoAlign (AprilTag ID 10 or 26)
+     *   LB  -> Intake forward (intake)
+     *   RB  -> Intake reverse (eject)
+     *   Y   -> Pivot UP   A -> Pivot DOWN
      */
     private final CommandXboxController m_driverController =
         new CommandXboxController(DRIVER_CONTROLLER_PORT);
 
     /**
-     * 포트 1: 오퍼레이터 (김도윤)
-     *   RT       → 슈터 정방향 발사
-     *   LT       → 슈터 역방향 구동
-     *   D-pad ↑  → 슈터 목표 속도 +5%
-     *   D-pad ↓  → 슈터 목표 속도 -5%
-     *   B        → 컨베이어 지속 구동
+     * Port 1: Operator (김도윤)
+     *   RT       -> Shooter forward
+     *   LT       -> Shooter reverse
+     *   D-pad Up -> Shooter +5%   Down -> -5%
+     *   B        -> Conveyor run
      */
     private final CommandXboxController m_operatorController =
         new CommandXboxController(OPERATOR_CONTROLLER_PORT);
@@ -66,18 +63,15 @@ public class RobotContainer {
     }
 
     private void configureAutoChooser() {
-        // 오토 0번: 드라이브 전진 + 인테이크 (기본값)
-        m_autoChooser.setDefaultOption("Auto 0 - Drive + Intake (송주원)",
+        m_autoChooser.setDefaultOption("Auto 0 - Drive + Intake (Juwon)",
             new Auto0(m_drive, m_intakeRoller));
-        // 오토 1번: 슈터 + 컨베이어
-        m_autoChooser.addOption("Auto 1 - Shooter + Conveyor (김도윤)",
+        m_autoChooser.addOption("Auto 1 - Shooter + Conveyor (Doyun)",
             new Auto1(m_shooter, m_conveyor));
 
-        // PathPlanner 오토 추가 시도 (실패해도 무시)
+        // PathPlanner auto (optional)
         try {
-            AutoBuilder.buildAutoChooser().getOptions().forEach((name, cmd) -> {
-                if (!name.equals("None")) m_autoChooser.addOption(name, cmd);
-            });
+            Command ppAuto = AutoBuilder.buildAutoChooser().getSelected();
+            if (ppAuto != null) m_autoChooser.addOption("PathPlanner Auto", ppAuto);
         } catch (RuntimeException e) {
             DriverStation.reportWarning("PathPlanner AutoBuilder not configured", false);
         }
@@ -87,7 +81,7 @@ public class RobotContainer {
 
     private void configureBindings() {
 
-        // ── 드라이브 기본 커맨드 (탱크 드라이브) ─────────────────
+        // Drive default command
         m_drive.setDefaultCommand(
             new DriveCommand(
                 m_drive,
@@ -96,7 +90,7 @@ public class RobotContainer {
             )
         );
 
-        // ── 슈터: 오퍼레이터 RT=정방향, LT=역방향, D-pad ±5% ─────
+        // Shooter: operator RT=forward, LT=reverse, D-pad +/-5%
         m_shooter.setDefaultCommand(
             new ShooterCommand(
                 m_shooter,
@@ -107,17 +101,17 @@ public class RobotContainer {
             )
         );
 
-        // ── RT: AutoAlign (AprilTag ID 10 or 26, 방향만 정렬) ────
+        // RT: AutoAlign (AprilTag ID 10 or 26, yaw only)
         m_driverController.rightTrigger(0.1)
             .whileTrue(new AutoAlignCommand(m_drive, m_vision));
 
-        // ── 인테이크: LB=흡입(정방향), RB=토출(역방향) ───────────
+        // LB: Intake forward (intake)   RB: Intake reverse (eject)
         m_driverController.leftBumper()
             .whileTrue(new IntakeRollerCommand(m_intakeRoller, false));
         m_driverController.rightBumper()
             .whileTrue(new IntakeRollerCommand(m_intakeRoller, true));
 
-        // ── 피벗: Y=UP / A=DOWN ──────────────────────────────────
+        // Y: Pivot UP   A: Pivot DOWN
         m_driverController.y().whileTrue(
             new IntakePivotCommand(m_intakePivot, Direction.UP)
         );
@@ -125,7 +119,7 @@ public class RobotContainer {
             new IntakePivotCommand(m_intakePivot, Direction.DOWN)
         );
 
-        // ── 컨베이어: 오퍼레이터 B 버튼 지속 구동 ────────────────
+        // Operator B: Conveyor continuous
         m_operatorController.b().whileTrue(new ConveyorCommand(m_conveyor));
     }
 
