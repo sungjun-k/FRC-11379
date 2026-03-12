@@ -21,6 +21,7 @@ public class Robot extends TimedRobot {
         CommandScheduler.getInstance().run();
     }
 
+    // ── 오토 ──────────────────────────────────────────────────
     @Override
     public void autonomousInit() {
         m_robotContainer.resetGyro();
@@ -30,25 +31,23 @@ public class Robot extends TimedRobot {
         }
     }
 
+    // ── 텔레옥 ────────────────────────────────────────────────
     @Override
     public void teleopInit() {
+        // 오토 커맨드 중단 (오토 뒤로 텔레옥 장시 실행 방지)
         if (m_autonomousCommand != null) {
             m_autonomousCommand.cancel();
         }
-        m_robotContainer.resetPivotToHome();
+        // 피벗 PID OFF 보장 (오토에서 내려간 체 텔레옥 시작될 때 올라가는 문제 방지)
+        m_robotContainer.pivotDisable();
     }
 
-    // ── Test 모드: AprilTag ID 10/26 거리 1m 유지 ────────────────
+    // ── 테스트 ────────────────────────────────────────────────
     @Override
     public void testInit() {
         CommandScheduler.getInstance().cancelAll();
         m_distHoldCommand = m_robotContainer.createDistHoldCommand();
         m_distHoldCommand.schedule();
-    }
-
-    @Override
-    public void testPeriodic() {
-        // CommandScheduler가 robotPeriodic()에서 이미 실행하므로 별도 코드 불필
     }
 
     @Override
@@ -62,4 +61,5 @@ public class Robot extends TimedRobot {
     @Override public void disabledPeriodic()   {}
     @Override public void autonomousPeriodic() {}
     @Override public void teleopPeriodic()     {}
+    @Override public void testPeriodic()       {}
 }
