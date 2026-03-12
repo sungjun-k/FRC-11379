@@ -9,6 +9,8 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import frc.robot.autos.Auto0;
+import frc.robot.autos.Auto1;
 import frc.robot.commands.AutoAlignCommand;
 import frc.robot.commands.ConveyorCommand;
 import frc.robot.commands.DriveCommand;
@@ -26,8 +28,6 @@ import frc.robot.subsystems.VisionSubsystem;
 public class RobotContainer {
 
     // ── 서브시스템 ────────────────────────────────────────────
-    // ★ VisionSubsystem을 DriveSubsystem보다 먼저 선언해야 합니다.
-    //   DriveSubsystem 생성자에 m_vision을 주입하는 구조이기 때문입니다.
     private final VisionSubsystem       m_vision        = new VisionSubsystem();
     private final DriveSubsystem        m_drive         = new DriveSubsystem(m_vision);
     private final ShooterSubsystem      m_shooter       = new ShooterSubsystem();
@@ -35,46 +35,51 @@ public class RobotContainer {
     private final IntakePivotSubsystem  m_intakePivot   = new IntakePivotSubsystem();
     private final ConveyorSubsystem     m_conveyor      = new ConveyorSubsystem();
 
-    // ── 콘트롤러 ───────────────────────────────────────────
-    /** 포트 0: 드라이버 (드라이브 + 슈터 + 자동 정렬)
-     *
-     * 버튼 배치:
-     *   왼쪽 스틱 Y축 / 오른쪽 스틱 X축 → 주행 (DriveCommand)
-     *   RT       → 슈터 정방향 발사
-     *   LT       → 슈터 역방향 구동
-     *   D-pad ↑  → 슈터 목표 속도 +5%
-     *   D-pad ↓  → 슈터 목표 속도 -5%
-     *   X 버튼  → 제자리 AprilTag 조준 (AutoAlignCommand)
+    // ── 컨트롤러 ─────────────────────────────────────────────
+    /**
+     * 포트 0: 드라이버 (송주원)
+     *   왼쪽 스틱 Y / 오른쪽 스틱 X → 탱크 드라이브
+     *   RT  → AutoAlignCommand (AprilTag ID 10 or 26, 방향만 정렬)
+     *   LB  → 인테이크 롤러 정방향 (흡입)
+     *   RB  → 인테이크 롤러 역방향 (토출)
+     *   Y   → 피벗 UP   A → 피벗 DOWN
      */
     private final CommandXboxController m_driverController =
         new CommandXboxController(DRIVER_CONTROLLER_PORT);
 
     /**
-     * 오퍼레이터 (인테이크 / 피벗 / 콘베이어)
-     * 콘트롤러 한 대로 테스트하려면: OIConstants.OPERATOR_CONTROLLER_PORT = 0 유지
-     *
-     * 버튼 배치:
-     *   RB 버튼 → 인테이크 롤러 구동
-     *   Y 버튼  → 피벗 UP (수납)
-     *   A 버튼  → 피벗 DOWN (전개)
-     *   LB 버튼 → 콘베이어 구동
+     * 포트 1: 오퍼레이터 (김도윤)
+     *   RT       → 슈터 정방향 발사
+     *   LT       → 슈터 역방향 구동
+     *   D-pad ↑  → 슈터 목표 속도 +5%
+     *   D-pad ↓  → 슈터 목표 속도 -5%
+     *   B        → 컨베이어 지속 구동
      */
     private final CommandXboxController m_operatorController =
         new CommandXboxController(OPERATOR_CONTROLLER_PORT);
 
-    private SendableChooser<Command> m_autoChooser;
+    private final SendableChooser<Command> m_autoChooser = new SendableChooser<>();
 
     public RobotContainer() {
         configureBindings();
+        configureAutoChooser();
+    }
 
+    private void configureAutoChooser() {
+        // 오토 0번: 드라이브 전진 + 인테이크 (기본값)
+        m_autoChooser.setDefaultOption("Auto 0 - Drive + Intake (송주원)",
+            new Auto0(m_drive, m_intakeRoller));
+        // 오토 1번: 슈터 + 컨베이어
+        m_autoChooser.addOption("Auto 1 - Shooter + Conveyor (김도윤)",
+            new Auto1(m_shooter, m_conveyor));
+
+        // PathPlanner 오토 추가 시도 (실패해도 무시)
         try {
-            m_autoChooser = AutoBuilder.buildAutoChooser();
+            AutoBuilder.buildAutoChooser().getOptions().forEach((name, cmd) -> {
+                if (!name.equals("None")) m_autoChooser.addOption(name, cmd);
+            });
         } catch (RuntimeException e) {
-            DriverStation.reportError(
-                "AutoBuilder not configured, using empty auto chooser",
-                e.getStackTrace()
-            );
-            m_autoChooser = new SendableChooser<>();
+            DriverStation.reportWarning("PathPlanner AutoBuilder not configured", false);
         }
 
         SmartDashboard.putData("Auto Mode", m_autoChooser);
@@ -82,7 +87,7 @@ public class RobotContainer {
 
     private void configureBindings() {
 
-        // ── 드라이브: 직진 보정 활성화 ────────────────────
+        // ── 드라이브 기본 커맨드 (탱크 드라이브) ─────────────────
         m_drive.setDefaultCommand(
             new DriveCommand(
                 m_drive,
@@ -91,34 +96,37 @@ public class RobotContainer {
             )
         );
 
-        // ── 슈터: RT = 정방향 발사, LT = 역방향 ───────────────────
-        //       D-pad 위화살표 = 목표 속도 +5%, 아래화살표 = -5%
+        // ── 슈터: 오퍼레이터 RT=정방향, LT=역방향, D-pad ±5% ─────
         m_shooter.setDefaultCommand(
             new ShooterCommand(
                 m_shooter,
-                m_driverController::getRightTriggerAxis,
-                m_driverController::getLeftTriggerAxis,
-                () -> m_driverController.getHID().getPOV() == 0,    // D-pad UP
-                () -> m_driverController.getHID().getPOV() == 180   // D-pad DOWN
+                m_operatorController::getRightTriggerAxis,
+                m_operatorController::getLeftTriggerAxis,
+                () -> m_operatorController.getHID().getPOV() == 0,
+                () -> m_operatorController.getHID().getPOV() == 180
             )
         );
 
-        // ── 자동 정렬: X 버튼 누르고 있는 동안 제자리 AprilTag 조준 ──
-        m_driverController.x().whileTrue(new AutoAlignCommand(m_drive, m_vision));
+        // ── RT: AutoAlign (AprilTag ID 10 or 26, 방향만 정렬) ────
+        m_driverController.rightTrigger(0.1)
+            .whileTrue(new AutoAlignCommand(m_drive, m_vision));
 
-        // ── 인테이크 롤러: RB 버튼 누르는 동안 구동 ─────────────
-        m_operatorController.rightBumper().whileTrue(new IntakeRollerCommand(m_intakeRoller));
+        // ── 인테이크: LB=흡입(정방향), RB=토출(역방향) ───────────
+        m_driverController.leftBumper()
+            .whileTrue(new IntakeRollerCommand(m_intakeRoller, false));
+        m_driverController.rightBumper()
+            .whileTrue(new IntakeRollerCommand(m_intakeRoller, true));
 
-        // ── 인테이크 피벗: Y = UP(수납) / A = DOWN(전개) ───────────────
-        m_operatorController.y().whileTrue(
+        // ── 피벗: Y=UP / A=DOWN ──────────────────────────────────
+        m_driverController.y().whileTrue(
             new IntakePivotCommand(m_intakePivot, Direction.UP)
         );
-        m_operatorController.a().whileTrue(
+        m_driverController.a().whileTrue(
             new IntakePivotCommand(m_intakePivot, Direction.DOWN)
         );
 
-        // ── 콘베이어: LB 버튼 누르는 동안 구동 ──────────────
-        m_operatorController.leftBumper().whileTrue(new ConveyorCommand(m_conveyor));
+        // ── 컨베이어: 오퍼레이터 B 버튼 지속 구동 ────────────────
+        m_operatorController.b().whileTrue(new ConveyorCommand(m_conveyor));
     }
 
     public Command getAutonomousCommand() {

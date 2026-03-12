@@ -6,24 +6,30 @@ import frc.robot.subsystems.IntakeRollerSubsystem;
 
 /**
  * 인테이크 롤러 커맨드
- * 버튼을 누르는 동안 롤러를 구동하고, 떼면 정지합니다.
- *
- * ★ 방향 반전이 필요하면:
- *   Constants.IntakeConstants.ROLLER_INVERTED 를 true 로 변경하세요.
+ * reversed=false → 정방향 흡입 (RB)
+ * reversed=true  → 역방향 토출 (LB)
  */
 public class IntakeRollerCommand extends Command {
 
     private final IntakeRollerSubsystem m_intake;
+    private final boolean m_reversed;
 
+    /** 정방향 흡입 */
     public IntakeRollerCommand(IntakeRollerSubsystem intake) {
+        this(intake, false);
+    }
+
+    /** reversed=true 이면 역방향 구동 */
+    public IntakeRollerCommand(IntakeRollerSubsystem intake, boolean reversed) {
         m_intake = intake;
+        m_reversed = reversed;
         addRequirements(intake);
     }
 
     @Override
     public void execute() {
-        // ROLLER_INVERTED == true 이면 음수 방향으로 구동
         double direction = IntakeConstants.ROLLER_INVERTED ? -1.0 : 1.0;
+        if (m_reversed) direction = -direction;
         m_intake.setSpeed(direction * IntakeConstants.ROLLER_SPEED);
     }
 
@@ -34,6 +40,6 @@ public class IntakeRollerCommand extends Command {
 
     @Override
     public boolean isFinished() {
-        return false; // whileTrue 바인딩과 함께 사용
+        return false;
     }
 }
