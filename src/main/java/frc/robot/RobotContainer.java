@@ -33,26 +33,12 @@ public class RobotContainer {
     private final IntakePivotSubsystem  m_intakePivot   = new IntakePivotSubsystem();
     private final ConveyorSubsystem     m_conveyor      = new ConveyorSubsystem();
 
-    /**
-     * Port 0: Driver (송주원)
-     *   Left Y / Right X -> Tank Drive
-     *   RT  -> AutoAlign (AprilTag ID 10 or 26)
-     *   LB  -> Intake forward (intake)
-     *   RB  -> Intake reverse (eject)
-     *   Y   -> Pivot UP   A -> Pivot DOWN
-     */
+    // 포트 0: 드라이버 (송주원)
+    // 포트 1: 오퍼레이터 (김도윤)
     private final CommandXboxController m_driverController =
-        new CommandXboxController(DRIVER_CONTROLLER_PORT);
-
-    /**
-     * Port 1: Operator (김도윤)
-     *   RT       -> Shooter forward
-     *   LT       -> Shooter reverse
-     *   D-pad Up -> Shooter +5%   Down -> -5%
-     *   B        -> Conveyor run
-     */
+        new CommandXboxController(DRIVER_CONTROLLER_PORT);    // 0
     private final CommandXboxController m_operatorController =
-        new CommandXboxController(OPERATOR_CONTROLLER_PORT);
+        new CommandXboxController(OPERATOR_CONTROLLER_PORT);  // 1
 
     private final SendableChooser<Command> m_autoChooser = new SendableChooser<>();
 
@@ -66,19 +52,19 @@ public class RobotContainer {
             "Auto 0 - Pivot Down > Reverse > Shoot",
             new Auto0(m_drive, m_intakePivot, m_shooter, m_conveyor)
         );
-
         try {
             Command ppAuto = AutoBuilder.buildAutoChooser().getSelected();
             if (ppAuto != null) m_autoChooser.addOption("PathPlanner Auto", ppAuto);
         } catch (RuntimeException e) {
             DriverStation.reportWarning("PathPlanner AutoBuilder not configured", false);
         }
-
         SmartDashboard.putData("Auto Mode", m_autoChooser);
     }
 
     private void configureBindings() {
 
+        // ── 드라이버 (Port 0, 송주원) ────────────────────────────
+        // Left Y / Right X → 탱크 드라이브
         m_drive.setDefaultCommand(
             new DriveCommand(
                 m_drive,
@@ -87,27 +73,18 @@ public class RobotContainer {
             )
         );
 
-        m_shooter.setDefaultCommand(
-            new ShooterCommand(
-                m_shooter,
-                m_operatorController::getRightTriggerAxis,
-                m_operatorController::getLeftTriggerAxis,
-                () -> m_operatorController.getHID().getPOV() == 0,
-                () -> m_operatorController.getHID().getPOV() == 180
-            )
-        );
-
-        // RT: AutoAlign (AprilTag ID 10 or 26, yaw only)
+        // RT (0.1이상) → AutoAlign (AprilTag ID 10 or 26)
         m_driverController.rightTrigger(0.1)
             .whileTrue(new AutoAlignCommand(m_drive, m_vision));
 
-        // LB: Intake forward   RB: Intake reverse
+        // LB → 인테이크 흡입 (forward)
+        // RB → 인테이크 토출 (reverse)
         m_driverController.leftBumper()
             .whileTrue(new IntakeRollerCommand(m_intakeRoller, false));
         m_driverController.rightBumper()
             .whileTrue(new IntakeRollerCommand(m_intakeRoller, true));
 
-        // Y: Pivot UP   A: Pivot DOWN
+        // Y → 피벗 UP    A → 피벗 DOWN
         m_driverController.y().whileTrue(
             new IntakePivotCommand(m_intakePivot, Direction.UP)
         );
@@ -115,7 +92,21 @@ public class RobotContainer {
             new IntakePivotCommand(m_intakePivot, Direction.DOWN)
         );
 
-        // Operator B: Conveyor continuous
+        // ── 오퍼레이터 (Port 1, 김도윤) ────────────────────────────
+        // RB → 슈터 정방향 발사
+        // RT → 슈터 역방향 (트리거 측랗값 비례)
+        // D-pad ↑↓ → 막히 속도 조절
+        m_shooter.setDefaultCommand(
+            new ShooterCommand(
+                m_shooter,
+                () -> m_operatorController.getHID().getRightBumper(),
+                m_operatorController::getRightTriggerAxis,
+                () -> m_operatorController.getHID().getPOV() == 0,
+                () -> m_operatorController.getHID().getPOV() == 180
+            )
+        );
+
+        // B → 컨베이어 패턴 구동 (0.15초 ON / 0.40초 OFF)
         m_operatorController.b().whileTrue(new ConveyorCommand(m_conveyor));
     }
 
@@ -127,7 +118,6 @@ public class RobotContainer {
         m_drive.zeroGyro();
     }
 
-    /** 텔레옵 진입 시 피벗 PID 목표를 HOME으로 리셋 */
     public void resetPivotToHome() {
         m_intakePivot.retractIntake();
     }
