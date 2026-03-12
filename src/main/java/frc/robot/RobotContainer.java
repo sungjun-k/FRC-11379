@@ -10,7 +10,6 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.autos.Auto0;
-import frc.robot.autos.Auto1;
 import frc.robot.commands.AutoAlignCommand;
 import frc.robot.commands.ConveyorCommand;
 import frc.robot.commands.DriveCommand;
@@ -63,12 +62,11 @@ public class RobotContainer {
     }
 
     private void configureAutoChooser() {
-        m_autoChooser.setDefaultOption("Auto 0 - Drive + Intake (Juwon)",
-            new Auto0(m_drive, m_intakeRoller));
-        m_autoChooser.addOption("Auto 1 - Shooter + Conveyor (Doyun)",
-            new Auto1(m_shooter, m_conveyor));
+        m_autoChooser.setDefaultOption(
+            "Auto 0 - Pivot Down > Reverse > Shoot",
+            new Auto0(m_drive, m_intakePivot, m_shooter, m_conveyor)
+        );
 
-        // PathPlanner auto (optional)
         try {
             Command ppAuto = AutoBuilder.buildAutoChooser().getSelected();
             if (ppAuto != null) m_autoChooser.addOption("PathPlanner Auto", ppAuto);
@@ -81,7 +79,6 @@ public class RobotContainer {
 
     private void configureBindings() {
 
-        // Drive default command
         m_drive.setDefaultCommand(
             new DriveCommand(
                 m_drive,
@@ -90,7 +87,6 @@ public class RobotContainer {
             )
         );
 
-        // Shooter: operator RT=forward, LT=reverse, D-pad +/-5%
         m_shooter.setDefaultCommand(
             new ShooterCommand(
                 m_shooter,
@@ -105,7 +101,7 @@ public class RobotContainer {
         m_driverController.rightTrigger(0.1)
             .whileTrue(new AutoAlignCommand(m_drive, m_vision));
 
-        // LB: Intake forward (intake)   RB: Intake reverse (eject)
+        // LB: Intake forward   RB: Intake reverse
         m_driverController.leftBumper()
             .whileTrue(new IntakeRollerCommand(m_intakeRoller, false));
         m_driverController.rightBumper()
