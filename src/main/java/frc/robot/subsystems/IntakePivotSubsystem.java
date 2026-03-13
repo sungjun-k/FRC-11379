@@ -22,9 +22,9 @@ import frc.robot.Constants.IntakeConstants;
  * 인테이크 피벗 서브시스템
  *
  * ⚠️ PID는 m_pidEnabled == true 일 때만 실행됩니다.
- *    버튼을 누르는 동안만 IntakePivotCommand이 enablePID() 호출 후
- *    목표를 설정하고, 버튼을 딱 때 disablePID() 호출합니다.
- *    따라서 텔레옥 EN 시잘로 인테이크가 올라가는 문제가 없습니다.
+ *    버튼을 누르는 동안만 IntakePivotCommand이 enablePID() 호캜 후
+ *    목표를 설정하고, 버튼을 떼면 disablePID() 호캜합니다.
+ *    따라서 텔레옵 EN 시잡로 인테이크가 올라가는 문제가 없습니다.
  */
 public class IntakePivotSubsystem extends SubsystemBase {
 
@@ -50,13 +50,13 @@ public class IntakePivotSubsystem extends SubsystemBase {
             .p(IntakeConstants.PIVOT_KP)
             .i(IntakeConstants.PIVOT_KI)
             .d(IntakeConstants.PIVOT_KD)
-            .outputRange(-0.3, 0.3);
+            .outputRange(-0.6, 0.6); // 지글 속도를 위해 기존 ±0.3 → ±0.6 상향
 
         SparkMaxConfig config = new SparkMaxConfig();
         config
             .smartCurrentLimit((int) IntakeConstants.PIVOT_CURRENT_LIMIT_AMPS)
             .secondaryCurrentLimit(IntakeConstants.PIVOT_SECONDARY_CURRENT_LIMIT_AMPS)
-            .idleMode(IdleMode.kBrake) // 버튼 뉙 때 kBrake로 제자리 유지
+            .idleMode(IdleMode.kBrake)
             .apply(softLimitConfig)
             .apply(closedLoopConfig);
 
@@ -70,22 +70,27 @@ public class IntakePivotSubsystem extends SubsystemBase {
         m_encoder.setPosition(IntakeConstants.PIVOT_HOME_POS);
     }
 
-    // ── PID 활성화 / 비활성화 ────────────────────────────────
-    /** 버튼 누를 때 IntakePivotCommand이 호출 */
+    // ── PID 활성화 / 비활성화 ──────────────────────────────────
     public void enablePID() {
         m_pidEnabled = true;
     }
 
-    /** 버튼 뜨를 때 IntakePivotCommand이 호출 - 모터 정지 */
     public void disablePID() {
         m_pidEnabled = false;
         m_pivotMotor.set(0);
     }
 
-    // ── 목표 위치 설정 ────────────────────────────────────────
+    // ── 목표 위치 설정 ──────────────────────────────────────
     public void deployIntake()  { m_targetPosition = IntakeConstants.PIVOT_INTAKE_POS; }
     public void retractIntake() { m_targetPosition = IntakeConstants.PIVOT_HOME_POS;   }
     public void holdCurrentPosition() { m_targetPosition = m_encoder.getPosition();    }
+
+    /**
+     * 임의 엔코더 위치를 목표로 설정 (IntakeJiggleCommand 등에서 사용)
+     */
+    public void setTarget(double position) {
+        m_targetPosition = position;
+    }
 
     public void bumpDown() {
         m_targetPosition = Math.min(
@@ -98,7 +103,7 @@ public class IntakePivotSubsystem extends SubsystemBase {
             IntakeConstants.PIVOT_REVERSE_SOFT_LIMIT);
     }
 
-    // ── 상태 조회 ────────────────────────────────────────────────
+    // ── 상태 조회 ────────────────────────────────────────────
     public double  getPosition()    { return m_encoder.getPosition(); }
     public boolean isAtTarget()     { return Math.abs(m_encoder.getPosition() - m_targetPosition) < 0.3; }
     public boolean isOverCurrent()  { return m_pivotMotor.getOutputCurrent() > IntakeConstants.PIVOT_CURRENT_LIMIT_AMPS; }
@@ -107,7 +112,7 @@ public class IntakePivotSubsystem extends SubsystemBase {
         m_targetPosition = IntakeConstants.PIVOT_HOME_POS;
     }
 
-    // ── 중력 보상 FF ──────────────────────────────────────────
+    // ── 중력 보상 FF ───────────────────────────────────────
     private double getGravityFF() {
         double deg = m_encoder.getPosition() * (360.0 / IntakeConstants.PIVOT_GEAR_RATIO);
         double angleFromHoriz = IntakeConstants.PIVOT_HOME_ANGLE_DEG - deg;
@@ -118,7 +123,6 @@ public class IntakePivotSubsystem extends SubsystemBase {
     @Override
     public void periodic() {
         if (m_pidEnabled) {
-            // 버튼 누르는 동안만 PID 실행
             m_controller.setReference(
                 m_targetPosition,
                 ControlType.kPosition,
@@ -127,8 +131,6 @@ public class IntakePivotSubsystem extends SubsystemBase {
                 ArbFFUnits.kVoltage
             );
         }
-        // PID가 OFF이면 disablePID()에서 set(0)을 했으므로
-        // 여기에서 추가로 다룰 것이 없음
 
         SmartDashboard.putNumber("Pivot/Position",  m_encoder.getPosition());
         SmartDashboard.putNumber("Pivot/Target",    m_targetPosition);
