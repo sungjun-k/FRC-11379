@@ -47,8 +47,8 @@ public class RobotContainer {
 
     private void configureAutoChooser() {
         m_autoChooser.setDefaultOption(
-            "Auto 0 - Pivot Down > Reverse > Shoot",
-            new Auto0(m_drive, m_intakePivot, m_shooter, m_conveyor)
+            "Auto 0 - Jiggle > Reverse > Shoot",
+            new Auto0(m_drive, m_intakePivot, m_intakeRoller, m_shooter, m_conveyor)
         );
         try {
             Command ppAuto = AutoBuilder.buildAutoChooser().getSelected();
@@ -62,7 +62,6 @@ public class RobotContainer {
     private void configureBindings() {
 
         // ━━ Driver (Port 0, 송주원) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // Left Y / Right X → 탱크 드라이브
         m_drive.setDefaultCommand(new DriveCommand(
             m_drive,
             () -> -m_driver.getLeftY(),
@@ -81,7 +80,6 @@ public class RobotContainer {
         m_driver.a().whileTrue(new IntakePivotCommand(m_intakePivot, Direction.DOWN));
 
         // ━━ Operator (Port 1, 김도윤) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // RB → 슈터 정방향   RT → 슈터 역방향   D-pad ±5%
         m_shooter.setDefaultCommand(new ShooterCommand(
             m_shooter,
             m_operator.rightBumper(),
